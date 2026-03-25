@@ -261,14 +261,14 @@
 
   <div class="tools">
 
-    <button class="tool-btn csv" onclick="">
+    <button class="tool-btn csv" id="csv-btn">
       <div class="tool-icon">⬡</div>
       <div class="tool-label">EDIT CSV</div>
       <div class="tool-desc">Filter, replace &amp; clean<br>CSV files visually</div>
       <div class="tool-tag">.csv</div>
     </button>
 
-    <button class="tool-btn vcard" onclick="">
+    <button class="tool-btn vcard" id="vcard-btn">
       <div class="tool-icon">📇</div>
       <div class="tool-label">vCARD → CSV</div>
       <div class="tool-desc">Convert &amp; edit vCard<br>contacts to CSV</div>
@@ -285,4 +285,13 @@
 </div>
 
 </body>
+<script>
+  document.getElementById('vcard-btn').addEventListener('click', () => {
+    window.location.href = 'vcard-editor.html';
+  });
+
+  document.getElementById('csv-btn').addEventListener('click', () => {
+    window.location.href = 'csv-editor.html';
+  });
+</script>
 </html>
