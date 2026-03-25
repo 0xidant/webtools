@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>vCard → CSV</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Syne:wght@400;500;600;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f7f5f0;
+    --surface: #ffffff;
+    --surface2: #f0ede6;
+    --surface3: #e8e4db;
+    --border: #d8d3c8;
+    --border2: #c4bfb2;
+    --accent: #c94f2a;
+    --accent2: #2a7fc9;
+    --accent3: #1a9e5a;
+    --text: #1a1714;
+    --text2: #5a5249;
+    --text3: #9a9189;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Syne', sans-serif;
+    /* excel grid */
+    --xl-header-bg: #c94f2a;
+    --xl-header-text: #ffffff;
+    --xl-row-even: #ffffff;
+    --xl-row-odd: #faf8f4;
+    --xl-row-hover: #fef3ef;
+    --xl-border: #e0dbd2;
+    --xl-rnum-bg: #f0ede6;
+    --xl-rnum-text: #9a9189;
+    --xl-changed-bg: rgba(41,127,201,0.07);
+    --xl-changed-border: #2a7fc9;
+    --xl-removed-bg: rgba(201,79,42,0.07);
+  }
+
+  :root.dark {
+    --bg: #0f0e0c;
+    --surface: #161412;
+    --surface2: #1e1b18;
+    --surface3: #252119;
+    --border: #302b24;
+    --border2: #3e3830;
+    --accent: #e8622a;
+    --accent2: #47a8ff;
+    --accent3: #3dbe72;
+    --text: #f0ece4;
+    --text2: #a09880;
+    --text3: #5a5245;
+    --xl-header-bg: #b84020;
+    --xl-header-text: #ffffff;
+    --xl-row-even: #161412;
+    --xl-row-odd: #131210;
+    --xl-row-hover: #221e18;
+    --xl-border: #2a2520;
+    --xl-rnum-bg: #1e1b18;
+    --xl-rnum-text: #5a5245;
+    --xl-changed-bg: rgba(71,168,255,0.08);
+    --xl-changed-border: #47a8ff;
+    --xl-removed-bg: rgba(232,98,42,0.08);
+  }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: background 0.2s, color 0.2s;
+  }
+
+  /* TOP BAR */
+  #topbar {
+    height: 50px;
+    min-height: 50px;
+    background: var(--surface);
+    border-bottom: 2px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 18px;
+    gap: 14px;
+    z-index: 10;
+  }
+
+  .logo {
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: -0.01em;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+  .logo .logo-sub {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text3);
+    font-family: var(--mono);
+    letter-spacing: 0.06em;
+    background: var(--surface2);
+    padding: 2px 6px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+  }
+
+  .sep { width: 1px; height: 22px; background: var(--border); flex-shrink: 0; }
+
+  #file-info {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 280px;
+  }
+
+  .btn {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 3px;
+    border: 1.5px solid var(--border2);
+    background: var(--surface2);
+    color: var(--text2);
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    text-transform: uppercase;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); background: var(--surface); }
+  .btn.primary {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+  .btn.primary:hover { opacity: 0.88; }
+
+  /* THEME TOGGLE */
+  #theme-toggle {
+    display: flex; align-items: center; gap: 7px;
+    cursor: pointer; padding: 5px 10px;
+    border-radius: 3px; border: 1.5px solid var(--border2);
+    background: var(--surface2); color: var(--text2);
+    font-family: var(--mono); font-size: 10px;
+    transition: all 0.15s; white-space: nowrap; user-select: none;
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  #theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+  .toggle-track {
+    width: 28px; height: 15px; background: var(--border2);
+    border-radius: 8px; position: relative; transition: background 0.2s; flex-shrink: 0;
+  }
+  .toggle-thumb {
+    width: 11px; height: 11px; background: var(--text3);
+    border-radius: 50%; position: absolute; top: 2px; left: 2px;
+    transition: transform 0.2s, background 0.2s;
+  }
+  :root.dark #theme-toggle .toggle-track { background: var(--accent); }
+  :root.dark #theme-toggle .toggle-thumb { background: #fff; transform: translateX(13px); }
+
+  #export-btn { margin-left: auto; }
+
+  /* MAIN LAYOUT */
+  #main { flex: 1; display: flex; overflow: hidden; min-height: 0; }
+
+  /* LEFT SIDEBAR */
+  #sidebar {
+    width: 11%;
+    min-width: 130px;
+    background: var(--surface);
+    border-right: 2px solid var(--border);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+
+  #sidebar-header {
+    padding: 10px 10px 8px;
+    font-family: var(--mono);
+    font-size: 8px; font-weight: 700;
+    color: var(--text3);
+    letter-spacing: 0.14em; text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  #columns-list {
+    flex: 1; overflow-y: auto; padding: 4px 0;
+    scrollbar-width: thin; scrollbar-color: var(--border2) transparent;
+  }
+
+  .col-item {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 10px; cursor: pointer;
+    transition: background 0.1s;
+    border-left: 3px solid transparent; user-select: none;
+  }
+  .col-item:hover { background: var(--surface2); }
+  .col-item.active { background: var(--surface2); border-left-color: var(--accent); }
+  .col-item.active .col-name { color: var(--accent); }
+  .col-item.included .col-check {
+    background: var(--accent3); border-color: var(--accent3);
+  }
+  .col-item.included .col-check::after {
+    content: '';
+    width: 7px; height: 5px;
+    border-left: 1.5px solid #fff; border-bottom: 1.5px solid #fff;
+    transform: rotate(-45deg) translateY(-1px);
+  }
+
+  .col-check {
+    width: 13px; height: 13px;
+    border: 1.5px solid var(--border2); border-radius: 2px;
+    flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    transition: all 0.1s; background: var(--surface3); cursor: pointer;
+  }
+
+  .col-name {
+    font-family: var(--mono); font-size: 10px; color: var(--text2);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    flex: 1; transition: color 0.1s;
+  }
+
+  .drag-handle {
+    cursor: grab; color: var(--text3); font-size: 11px; padding: 0 2px; flex-shrink: 0;
+  }
+  .drag-handle:active { cursor: grabbing; }
+
+  /* CONTENT */
+  #content { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+
+  #upper { flex: 1; display: flex; overflow: hidden; min-height: 0; }
+
+  /* EMPTY STATE */
+  #empty-state {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 14px; color: var(--text3);
+  }
+  #empty-state .big-icon { font-size: 48px; opacity: 0.3; }
+  #empty-state p { font-family: var(--mono); font-size: 11px; }
+
+  /* EDITOR PANEL */
+  #editor-panel { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+
+  /* VALUES SECTION */
+  #values-section {
+    flex: 1; overflow: hidden; display: flex;
+    flex-direction: column; border-bottom: 1px solid var(--border); min-height: 0;
+  }
+
+  .section-header {
+    padding: 7px 14px;
+    font-family: var(--mono); font-size: 8px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--text3); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px;
+    flex-shrink: 0; background: var(--surface);
+  }
+  .col-badge {
+    font-family: var(--mono); font-size: 9px;
+    padding: 2px 8px; background: var(--accent);
+    color: #fff; border-radius: 2px; font-weight: 700;
+  }
+  .badge {
+    font-family: var(--mono); font-size: 9px; padding: 2px 6px;
+    border-radius: 2px; background: var(--surface3); color: var(--text3); letter-spacing: 0.04em;
+  }
+
+  #values-list { flex: 1; overflow-y: auto; padding: 6px 0; scrollbar-width: thin; scrollbar-color: var(--border2) transparent; }
+
+  .value-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 5px 14px; transition: background 0.1s;
+  }
+  .value-row:hover { background: var(--surface2); }
+
+  .value-original {
+    font-family: var(--mono); font-size: 11px; color: var(--text2);
+    flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .value-original .count { font-size: 9px; color: var(--text3); margin-left: 6px; }
+
+  .arrow-icon { color: var(--text3); font-size: 12px; flex-shrink: 0; }
+
+  .value-input {
+    font-family: var(--mono); font-size: 11px;
+    background: var(--surface3); border: 1.5px solid var(--border);
+    border-radius: 3px; color: var(--text); padding: 4px 8px;
+    width: 170px; flex-shrink: 0; transition: border-color 0.15s; outline: none;
+  }
+  .value-input:focus { border-color: var(--accent2); }
+  .value-input.has-value { border-color: var(--accent2); color: var(--accent2); }
+
+  .remove-label {
+    display: flex; align-items: center; gap: 5px;
+    cursor: pointer; flex-shrink: 0;
+  }
+  .remove-label input[type=checkbox] { display: none; }
+  .remove-check {
+    width: 13px; height: 13px; border: 1.5px solid var(--border2);
+    border-radius: 2px; background: var(--surface3);
+    display: flex; align-items: center; justify-content: center; transition: all 0.12s;
+  }
+  .remove-label.checked .remove-check { background: var(--accent); border-color: var(--accent); }
+  .remove-label.checked .remove-check::after { content: '×'; color: #fff; font-size: 10px; line-height: 1; font-weight: 700; }
+  .remove-label span { font-family: var(--mono); font-size: 9px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.06em; }
+  .remove-label.checked span { color: var(--accent); }
+
+  /* EXCEL GRID */
+  #csv-preview {
+    height: 50%; min-height: 200px;
+    background: var(--xl-row-even);
+    border-top: 2px solid var(--border);
+    display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0;
+  }
+  #csv-preview .section-header { background: var(--surface2); }
+
+  #excel-wrap {
+    flex: 1; overflow: auto;
+    scrollbar-width: thin; scrollbar-color: var(--border2) transparent; position: relative;
+  }
+
+  #excel-table {
+    border-collapse: collapse; font-family: var(--mono);
+    font-size: 11px; min-width: 100%; table-layout: fixed;
+  }
+
+  #excel-table thead tr th:first-child {
+    background: var(--xl-rnum-bg); border-right: 2px solid var(--xl-border);
+    border-bottom: 2px solid var(--xl-border);
+    width: 42px; min-width: 42px; max-width: 42px;
+    position: sticky; top: 0; left: 0; z-index: 3;
+  }
+
+  #excel-table thead tr th {
+    background: var(--xl-header-bg); color: var(--xl-header-text);
+    font-size: 10px; font-weight: 700; letter-spacing: 0.05em;
+    padding: 0 10px; height: 28px; text-align: left;
+    position: sticky; top: 0; z-index: 2;
+    border-right: 1px solid rgba(255,255,255,0.15);
+    border-bottom: 2px solid rgba(0,0,0,0.15);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 110px;
+  }
+
+  #excel-table td.rnum {
+    background: var(--xl-rnum-bg); color: var(--xl-rnum-text);
+    font-size: 10px; text-align: right; padding: 0 6px 0 0; height: 22px;
+    border-right: 2px solid var(--xl-border); border-bottom: 1px solid var(--xl-border);
+    position: sticky; left: 0; z-index: 1; user-select: none;
+    width: 42px; min-width: 42px;
+  }
+
+  #excel-table td {
+    padding: 0 10px; height: 22px;
+    border-right: 1px solid var(--xl-border);
+    border-bottom: 1px solid var(--xl-border);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-width: 220px; color: var(--text2); transition: background 0.08s;
+  }
+
+  #excel-table tbody tr:nth-child(even) td { background: var(--xl-row-even); }
+  #excel-table tbody tr:nth-child(odd) td { background: var(--xl-row-odd); }
+  #excel-table tbody tr:hover td { background: var(--xl-row-hover) !important; }
+  #excel-table tbody tr:nth-child(even) td.rnum,
+  #excel-table tbody tr:nth-child(odd) td.rnum { background: var(--xl-rnum-bg) !important; }
+
+  #excel-table td.cell-changed {
+    color: var(--accent2); background: var(--xl-changed-bg) !important;
+    border-bottom-color: var(--xl-changed-border);
+  }
+  #excel-table td.cell-removed {
+    color: var(--accent); background: var(--xl-removed-bg) !important;
+    font-style: italic; text-decoration: line-through; opacity: 0.7;
+  }
+
+  /* UPLOAD OVERLAY */
+  #upload-overlay {
+    position: fixed; inset: 0;
+    background: var(--bg);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 20px; z-index: 100;
+  }
+
+  .upload-box {
+    border: 2px dashed var(--border2);
+    border-radius: 6px; padding: 52px 72px;
+    display: flex; flex-direction: column;
+    align-items: center; gap: 16px; cursor: pointer;
+    transition: all 0.2s; background: var(--surface);
+    box-shadow: 0 2px 32px rgba(0,0,0,0.06);
+  }
+  .upload-box:hover, .upload-box.drag-over {
+    border-color: var(--accent); background: var(--surface2);
+  }
+  .upload-box .upload-icon { font-size: 44px; }
+  .upload-box h2 { font-family: var(--sans); font-size: 18px; font-weight: 700; color: var(--text); }
+  .upload-box p { font-family: var(--mono); font-size: 11px; color: var(--text3); }
+  .upload-box .file-types {
+    display: flex; gap: 8px; margin-top: 4px;
+  }
+  .file-type-badge {
+    font-family: var(--mono); font-size: 10px;
+    padding: 3px 10px; border-radius: 2px;
+    border: 1.5px solid var(--border2); color: var(--text3);
+    background: var(--surface3);
+  }
+
+  input[type=file] { display: none; }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+  .col-item.dragging { opacity: 0.35; }
+  .col-item.drag-over-top { border-top: 2px solid var(--accent); }
+  .col-item.drag-over-bottom { border-bottom: 2px solid var(--accent); }
+
+  /* Stats bar */
+  #stats-bar {
+    display: none;
+    padding: 5px 18px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    gap: 18px;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  .stat {
+    display: flex; align-items: center; gap: 6px;
+    font-family: var(--mono); font-size: 10px; color: var(--text3);
+  }
+  .stat strong { color: var(--text2); font-weight: 600; }
+  .stat .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent3); flex-shrink: 0; }
+  .stat .dot.orange { background: var(--accent); }
+  .stat .dot.blue { background: var(--accent2); }
+</style>
+</head>
+<body>
+
+<!-- UPLOAD OVERLAY -->
+<div id="upload-overlay">
+  <div class="upload-box" id="upload-box">
+    <div class="upload-icon">📇</div>
+    <h2>Drop your vCard file here</h2>
+    <p>All processing is local — nothing leaves your device</p>
+    <div class="file-types">
+      <span class="file-type-badge">.vcf</span>
+      <span class="file-type-badge">.vcard</span>
+    </div>
+    <button class="btn primary" onclick="document.getElementById('file-input').click()">Choose File</button>
+  </div>
+  <input type="file" id="file-input" accept=".vcf,.vcard,text/vcard,text/x-vcard">
+</div>
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <div class="logo">
+    vCard<span style="color:var(--text3);font-weight:400;margin:0 3px">→</span>CSV
+    <span class="logo-sub">EDITOR</span>
+  </div>
+  <div class="sep"></div>
+  <span id="file-info">no file loaded</span>
+  <button class="btn" id="change-file-btn" style="display:none" onclick="document.getElementById('file-input2').click()">↑ Replace</button>
+  <input type="file" id="file-input2" accept=".vcf,.vcard,text/vcard,text/x-vcard">
+  <div id="theme-toggle" onclick="toggleTheme()">
+    <div class="toggle-track"><div class="toggle-thumb"></div></div>
+    <span id="theme-label">Light</span>
+  </div>
+  <button class="btn primary" id="export-btn" style="display:none" onclick="exportCSV()">↓ Export CSV</button>
+</div>
+
+<!-- STATS BAR -->
+<div id="stats-bar">
+  <div class="stat"><span class="dot"></span><strong id="stat-contacts">0</strong> contacts</div>
+  <div class="sep" style="height:14px"></div>
+  <div class="stat"><span class="dot blue"></span><strong id="stat-fields">0</strong> fields detected</div>
+  <div class="sep" style="height:14px"></div>
+  <div class="stat"><span class="dot orange"></span><strong id="stat-phones">0</strong> phone numbers</div>
+  <div class="sep" style="height:14px"></div>
+  <div class="stat"><span class="dot" style="background:var(--accent2)"></span><strong id="stat-emails">0</strong> emails</div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+  <div id="sidebar">
+    <div id="sidebar-header">Fields</div>
+    <div id="columns-list"></div>
+  </div>
+
+  <div id="content">
+    <div id="upper">
+      <div id="empty-state">
+        <div class="big-icon">📋</div>
+        <p>Select a field from the left to edit values</p>
+      </div>
+
+      <div id="editor-panel">
+        <div id="values-section">
+          <div class="section-header">
+            <span>Unique Values</span>
+            <span class="col-badge" id="active-col-badge">—</span>
+            <span class="badge" id="unique-count-badge"></span>
+          </div>
+          <div id="values-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- EXCEL GRID PREVIEW -->
+    <div id="csv-preview">
+      <div class="section-header">
+        <span>📊 Live Preview</span>
+        <span id="xl-row-count" class="badge" style="margin-left:8px"></span>
+        <span style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-left:auto">
+          Highlighted = edited · field visibility &amp; order from sidebar
+        </span>
+      </div>
+      <div id="excel-wrap">
+        <table id="excel-table">
+          <thead><tr id="excel-thead-row"></tr></thead>
+          <tbody id="excel-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── STATE ────────────────────────────────────────────────────────────
+let rawData = [];       // array of contact objects
+let columns = [];       // field names in order
+let colVisible = {};
+let replacements = {};
+let activeCol = null;
+
+// ─── VCARD PARSER ─────────────────────────────────────────────────────
+function parseVCards(text) {
+  const contacts = [];
+  // Split by BEGIN:VCARD
+  const blocks = text.split(/BEGIN:VCARD/i).filter(b => b.trim());
+
+  blocks.forEach(block => {
+    block = block.replace(/END:VCARD.*/is, '').trim();
+    if (!block) return;
+
+    // Unfold lines (RFC 6350: continuation lines start with space/tab)
+    const unfolded = block.replace(/\r?\n[ \t]/g, '');
+    const lines = unfolded.split(/\r?\n/).filter(l => l.trim());
+
+    const contact = {};
+
+    // Track phone/email indices for multi-value
+    const phoneCounts = {};
+    const emailCounts = {};
+
+    lines.forEach(line => {
+      // Skip meta lines
+      if (/^(VERSION|PRODID|REV|UID|X-)/i.test(line)) return;
+
+      // Parse property: PROP;param1;param2:value
+      const colonIdx = line.indexOf(':');
+      if (colonIdx < 0) return;
+
+      const propPart = line.substring(0, colonIdx).toUpperCase();
+      const value = line.substring(colonIdx + 1).trim();
+
+      if (!value) return;
+
+      // N: Last;First;Middle;Prefix;Suffix
+      if (propPart === 'N') {
+        const parts = value.split(';');
+        const last = (parts[0] || '').trim();
+        const first = (parts[1] || '').trim();
+        const middle = (parts[2] || '').trim();
+        if (first) contact['First Name'] = contact['First Name'] || first;
+        if (last) contact['Last Name'] = contact['Last Name'] || last;
+        if (middle) contact['Middle Name'] = contact['Middle Name'] || middle;
+        return;
+      }
+
+      // FN: Full Name
+      if (propPart === 'FN') {
+        contact['Full Name'] = value;
+        return;
+      }
+
+      // ORG
+      if (propPart === 'ORG') {
+        const orgVal = value.replace(/;+$/, '').replace(/;/g, ' ').trim();
+        if (orgVal) contact['Organization'] = orgVal;
+        return;
+      }
+
+      // TITLE
+      if (propPart === 'TITLE') {
+        contact['Title'] = value;
+        return;
+      }
+
+      // EMAIL
+      if (/^EMAIL/.test(propPart)) {
+        // Determine label from params
+        let label = 'Email';
+        if (/WORK/i.test(propPart)) label = 'Email Work';
+        else if (/HOME/i.test(propPart)) label = 'Email Home';
+        emailCounts[label] = (emailCounts[label] || 0) + 1;
+        const key = emailCounts[label] === 1 ? label : `${label} ${emailCounts[label]}`;
+        contact[key] = value;
+        return;
+      }
+
+      // TEL
+      if (/^TEL/.test(propPart)) {
+        let label = 'Phone';
+        if (/WORK/i.test(propPart)) label = 'Phone Work';
+        else if (/HOME/i.test(propPart)) label = 'Phone Home';
+        else if (/CELL/i.test(propPart)) label = 'Phone Mobile';
+        else if (/FAX/i.test(propPart)) label = 'Phone Fax';
+        phoneCounts[label] = (phoneCounts[label] || 0) + 1;
+        const key = phoneCounts[label] === 1 ? label : `${label} ${phoneCounts[label]}`;
+        contact[key] = value;
+        return;
+      }
+
+      // ADR
+      if (/^ADR/.test(propPart)) {
+        const parts = value.split(';');
+        // PO Box;Extended;Street;City;State;PostalCode;Country
+        const street = (parts[2] || '').trim();
+        const city = (parts[3] || '').trim();
+        const state = (parts[4] || '').trim();
+        const zip = (parts[5] || '').trim();
+        const country = (parts[6] || '').trim();
+        let label = 'Address';
+        if (/WORK/i.test(propPart)) label = 'Address Work';
+        else if (/HOME/i.test(propPart)) label = 'Address Home';
+        if (street || city) contact[label] = [street, city, state, zip, country].filter(Boolean).join(', ');
+        return;
+      }
+
+      // URL
+      if (/^URL/.test(propPart)) {
+        contact['Website'] = value;
+        return;
+      }
+
+      // NOTE
+      if (propPart === 'NOTE') {
+        contact['Note'] = value;
+        return;
+      }
+
+      // BDAY
+      if (propPart === 'BDAY') {
+        contact['Birthday'] = value;
+        return;
+      }
+    });
+
+    // Only add if has meaningful data
+    if (Object.keys(contact).length > 0) {
+      contacts.push(contact);
+    }
+  });
+
+  return contacts;
+}
+
+function buildColumns(contacts) {
+  // Preferred column order
+  const preferred = [
+    'Full Name', 'First Name', 'Last Name', 'Middle Name',
+    'Organization', 'Title',
+    'Phone', 'Phone Mobile', 'Phone Work', 'Phone Home', 'Phone Fax',
+    'Phone 2', 'Phone Mobile 2', 'Phone Work 2', 'Phone Home 2',
+    'Email', 'Email Work', 'Email Home', 'Email 2',
+    'Address', 'Address Home', 'Address Work',
+    'Website', 'Birthday', 'Note'
+  ];
+
+  const allKeys = new Set();
+  contacts.forEach(c => Object.keys(c).forEach(k => allKeys.add(k)));
+
+  // Sort: preferred first, then alphabetical remainder
+  const cols = [...preferred.filter(k => allKeys.has(k))];
+  [...allKeys].forEach(k => { if (!cols.includes(k)) cols.push(k); });
+  return cols;
+}
+
+// ─── LOAD FILE ────────────────────────────────────────────────────────
+function loadFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const contacts = parseVCards(e.target.result);
+    if (!contacts.length) return alert('No vCards found in file.');
+
+    rawData = contacts;
+    columns = buildColumns(contacts);
+    colVisible = {};
+    replacements = {};
+    activeCol = null;
+
+    columns.forEach(c => { colVisible[c] = true; replacements[c] = {}; });
+
+    // Stats
+    const phones = contacts.filter(c => Object.keys(c).some(k => k.startsWith('Phone'))).length;
+    const emails = contacts.filter(c => Object.keys(c).some(k => k.startsWith('Email'))).length;
+    document.getElementById('stat-contacts').textContent = contacts.length;
+    document.getElementById('stat-fields').textContent = columns.length;
+    document.getElementById('stat-phones').textContent = phones;
+    document.getElementById('stat-emails').textContent = emails;
+
+    document.getElementById('file-info').textContent =
+      `${file.name}  ·  ${contacts.length} contacts  ·  ${columns.length} fields`;
+    document.getElementById('upload-overlay').style.display = 'none';
+    document.getElementById('change-file-btn').style.display = '';
+    document.getElementById('export-btn').style.display = '';
+    document.getElementById('stats-bar').style.display = 'flex';
+
+    renderSidebar();
+    renderCSVPreview();
+    showEmpty();
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+// ─── EDIT HELPERS ─────────────────────────────────────────────────────
+function getEdited(col, originalVal) {
+  if (!originalVal) return { value: '', changed: false };
+  const colRep = replacements[col] || {};
+  const parts = parseMultiValue(originalVal);
+  const out = [];
+  let changed = false;
+
+  for (const part of parts) {
+    const rep = colRep[part];
+    if (rep && rep.remove) { changed = true; continue; }
+    if (rep && rep.replace.trim() !== '') { out.push(rep.replace); changed = true; }
+    else out.push(part);
+  }
+  return { value: out.join(', '), changed };
+}
+
+function parseMultiValue(val) {
+  val = val.trim();
+  const parts = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i < val.length; i++) {
+    const c = val[i];
+    if (c === '"') { inQ = !inQ; }
+    else if (c === ',' && !inQ) { parts.push(cur.trim().replace(/^"|"$/g, '')); cur = ''; }
+    else cur += c;
+  }
+  parts.push(cur.trim().replace(/^"|"$/g, ''));
+  return parts.filter(p => p !== '');
+}
+
+// ─── SIDEBAR ──────────────────────────────────────────────────────────
+function renderSidebar() {
+  const list = document.getElementById('columns-list');
+  list.innerHTML = '';
+  columns.forEach(col => {
+    const item = document.createElement('div');
+    item.className = 'col-item' +
+      (colVisible[col] ? ' included' : '') +
+      (activeCol === col ? ' active' : '');
+    item.dataset.col = col;
+    item.draggable = true;
+    item.innerHTML = `
+      <span class="drag-handle">⠿</span>
+      <span class="col-check" data-check="${col}"></span>
+      <span class="col-name" title="${col}">${col}</span>
+    `;
+    item.querySelector('.col-check').addEventListener('click', e => {
+      e.stopPropagation();
+      colVisible[col] = !colVisible[col];
+      renderSidebar(); renderCSVPreview();
+    });
+    item.addEventListener('click', () => selectColumn(col));
+    setupDrag(item);
+    list.appendChild(item);
+  });
+}
+
+// ─── DRAG & DROP ──────────────────────────────────────────────────────
+let dragSrc = null;
+function setupDrag(item) {
+  item.addEventListener('dragstart', e => {
+    dragSrc = item;
+    setTimeout(() => item.classList.add('dragging'), 0);
+    e.dataTransfer.effectAllowed = 'move';
+  });
+  item.addEventListener('dragend', () => {
+    item.classList.remove('dragging');
+    document.querySelectorAll('.col-item').forEach(i => i.classList.remove('drag-over-top','drag-over-bottom'));
+  });
+  item.addEventListener('dragover', e => {
+    e.preventDefault();
+    if (item === dragSrc) return;
+    const rect = item.getBoundingClientRect();
+    document.querySelectorAll('.col-item').forEach(i => i.classList.remove('drag-over-top','drag-over-bottom'));
+    if (e.clientY < rect.top + rect.height / 2) item.classList.add('drag-over-top');
+    else item.classList.add('drag-over-bottom');
+  });
+  item.addEventListener('drop', e => {
+    e.preventDefault();
+    if (!dragSrc || dragSrc === item) return;
+    const srcCol = dragSrc.dataset.col;
+    const tgtCol = item.dataset.col;
+    const srcIdx = columns.indexOf(srcCol);
+    columns.splice(srcIdx, 1);
+    let newIdx = columns.indexOf(tgtCol);
+    const rect = item.getBoundingClientRect();
+    if (e.clientY >= rect.top + rect.height / 2) newIdx += 1;
+    columns.splice(newIdx, 0, srcCol);
+    renderSidebar(); renderCSVPreview();
+  });
+}
+
+// ─── SELECT COLUMN ────────────────────────────────────────────────────
+function selectColumn(col) {
+  activeCol = col;
+  document.getElementById('empty-state').style.display = 'none';
+  document.getElementById('editor-panel').style.display = 'flex';
+  document.getElementById('active-col-badge').textContent = col;
+  renderValuesList(col);
+  renderSidebar();
+}
+
+function showEmpty() {
+  activeCol = null;
+  document.getElementById('empty-state').style.display = 'flex';
+  document.getElementById('editor-panel').style.display = 'none';
+  renderSidebar();
+}
+
+// ─── VALUES LIST ──────────────────────────────────────────────────────
+function getUniqueValues(col) {
+  const counts = {};
+  rawData.forEach(row => {
+    const parts = parseMultiValue(row[col] || '');
+    parts.forEach(p => { if (p) counts[p] = (counts[p] || 0) + 1; });
+  });
+  return counts;
+}
+
+function renderValuesList(col) {
+  const counts = getUniqueValues(col);
+  const sortedVals = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+  document.getElementById('unique-count-badge').textContent = sortedVals.length + ' unique';
+
+  const list = document.getElementById('values-list');
+  list.innerHTML = '';
+  if (!replacements[col]) replacements[col] = {};
+
+  sortedVals.forEach(val => {
+    const rep = replacements[col][val] || { replace: '', remove: false };
+    const row = document.createElement('div');
+    row.className = 'value-row';
+    const removeChecked = rep.remove;
+    row.innerHTML = `
+      <span class="value-original">${escHtml(val)}<span class="count">×${counts[val]}</span></span>
+      <span class="arrow-icon">→</span>
+      <input class="value-input${rep.replace ? ' has-value' : ''}"
+             type="text" placeholder="replacement…"
+             value="${escHtml(rep.replace)}"
+             ${removeChecked ? 'disabled' : ''}>
+      <label class="remove-label${removeChecked ? ' checked' : ''}">
+        <input type="checkbox" ${removeChecked ? 'checked' : ''}>
+        <span class="remove-check"></span>
+        <span>Remove</span>
+      </label>
+    `;
+    const inp = row.querySelector('input[type=text]');
+    const chk = row.querySelector('input[type=checkbox]');
+    const lbl = row.querySelector('.remove-label');
+
+    inp.addEventListener('input', () => {
+      if (!replacements[col][val]) replacements[col][val] = { replace: '', remove: false };
+      replacements[col][val].replace = inp.value;
+      inp.classList.toggle('has-value', !!inp.value);
+      renderCSVPreview();
+    });
+    chk.addEventListener('change', () => {
+      if (!replacements[col][val]) replacements[col][val] = { replace: '', remove: false };
+      replacements[col][val].remove = chk.checked;
+      lbl.classList.toggle('checked', chk.checked);
+      inp.disabled = chk.checked;
+      renderCSVPreview();
+    });
+    list.appendChild(row);
+  });
+}
+
+// ─── EXCEL GRID ───────────────────────────────────────────────────────
+function renderCSVPreview() {
+  const visibleCols = columns.filter(c => colVisible[c]);
+  const theadRow = document.getElementById('excel-thead-row');
+  const tbody = document.getElementById('excel-tbody');
+  theadRow.innerHTML = ''; tbody.innerHTML = '';
+
+  if (!visibleCols.length || !rawData.length) {
+    document.getElementById('xl-row-count').textContent = '';
+    return;
+  }
+
+  const corner = document.createElement('th');
+  corner.textContent = '#';
+  theadRow.appendChild(corner);
+
+  visibleCols.forEach(col => {
+    const th = document.createElement('th');
+    th.textContent = col; th.title = col;
+    theadRow.appendChild(th);
+  });
+
+  document.getElementById('xl-row-count').textContent = rawData.length + ' contacts';
+
+  rawData.forEach((row, i) => {
+    const tr = document.createElement('tr');
+    const rnum = document.createElement('td');
+    rnum.className = 'rnum'; rnum.textContent = i + 1;
+    tr.appendChild(rnum);
+
+    visibleCols.forEach(col => {
+      const orig = row[col] || '';
+      const { value: edited, changed } = getEdited(col, orig);
+      const td = document.createElement('td');
+      if (changed) {
+        const wasRemoved = edited === '' && orig !== '';
+        td.className = wasRemoved ? 'cell-removed' : 'cell-changed';
+        td.textContent = wasRemoved ? orig : edited;
+        td.title = wasRemoved ? `REMOVED: "${orig}"` : `"${orig}" → "${edited}"`;
+      } else {
+        td.textContent = orig; td.title = orig;
+      }
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+}
+
+// ─── EXPORT ──────────────────────────────────────────────────────────
+function exportCSV() {
+  const visibleCols = columns.filter(c => colVisible[c]);
+  const lines = [visibleCols.map(q).join(',')];
+  rawData.forEach(row => {
+    lines.push(visibleCols.map(col => {
+      const orig = row[col] || '';
+      const { value } = getEdited(col, orig);
+      return q(value);
+    }).join(','));
+  });
+  const blob = new Blob([lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'contacts.csv';
+  a.click();
+}
+
+function q(v) {
+  if (!v) return '';
+  if (v.includes(',') || v.includes('"') || v.includes('\n'))
+    return '"' + v.replace(/"/g, '""') + '"';
+  return v;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ─── THEME ────────────────────────────────────────────────────────────
+function toggleTheme() {
+  const isDark = document.documentElement.classList.toggle('dark');
+  document.getElementById('theme-label').textContent = isDark ? 'Dark' : 'Light';
+}
+
+// ─── FILE EVENTS ──────────────────────────────────────────────────────
+document.getElementById('file-input').addEventListener('change', e => {
+  if (e.target.files[0]) loadFile(e.target.files[0]);
+});
+document.getElementById('file-input2').addEventListener('change', e => {
+  if (e.target.files[0]) loadFile(e.target.files[0]);
+});
+const uploadBox = document.getElementById('upload-box');
+uploadBox.addEventListener('dragover', e => { e.preventDefault(); uploadBox.classList.add('drag-over'); });
+uploadBox.addEventListener('dragleave', () => uploadBox.classList.remove('drag-over'));
+uploadBox.addEventListener('drop', e => {
+  e.preventDefault(); uploadBox.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+});
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop', e => {
+  e.preventDefault();
+  const f = e.dataTransfer.files[0];
+  if (f) loadFile(f);
+});
+</script>
+</body>
+</html>
